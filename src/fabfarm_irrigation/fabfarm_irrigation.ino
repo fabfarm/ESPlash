@@ -1,125 +1,92 @@
-/****************************************************************************
- *                                  Aknowledments                           * 
- *                                  by LucioPGN                             * 
- ****************************************************************************/
-/*  Up to this date: 07th of June 2020 I don't consider myself a programer 
- *  so I need to stand on top of giants sholders for my programing projects:
- *  A Portion of this code was based on Rui Santos Code; 
- *  Codes from Rui Santos mixed toghether:
- *  https://randomnerdtutorials.com/esp32-web-server-spiffs-spi-flash-file-system/
- *  https://randomnerdtutorials.com/esp32-relay-module-ac-web-server/
- *  https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
- *  From Techtutorialsx.com
- *  https://techtutorialsx.com/2017/12/01/esp32-arduino-asynchronous-http-webserver/
- *  A Portion of this code was based on Shakeels code for ESP8266 ;
- *  My contributions: 
- *     -So far I made it work on platformio :), that took me quite a lot of time
- *     -That means:
- *        +created a new project;
- *        +created a folder named data under the main folder (fabfarm_irrigation)
- *        +linked the platformio.ini to the folder of the project + the data folder
- *        +linked the needed libraries to their github repo in the platformio.ini
- *        +found a conflict with time library and A
- *  Things I still want to program for my final project:
- *    -so far I ported Shakeels code into ESP32;
- *    -separate functions from shakeels code into files;
- *    -separated functions from Rui Santos code into files.
- *    -simplify the code creating more functions;
- *    -try to separate the HTML part for a cleaner code;
- *    -Improve the appearance/Interface of the code
- *    -Add readings to HTML
- *    -Add a log of occurrences like over current
- *    -Add more safety for the equipment
- *    -Add a phone interface (APP)
- *    -Add function to set current time
- *    -Add renaming function to each relay so one can relate the relay to the area of interest or at least rename relays to actual areas of the farm.
- * 
- ****************************************************************************/
- 
+/* --------
+ * LucioPGN                             
+ * --------
+ *
+ * Contributors:
+ * - Jeffrey Knight http://github.com/jknight
+ */
 
-//Required Libraries
-#include "WiFi.h"
+#include <fstream>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <streambuf>
+#include <string>
+
+
+#include "Adafruit_Sensor.h"
+#include "ArduinoJson.h"
+#include "AsyncJson.h"
+#include "AsyncTCP.h"
+#include "DHT.h"
 #include "ESPAsyncWebServer.h"
 #include "SPIFFS.h"
-#include "AsyncTCP.h"
-#include "Adafruit_Sensor.h"
-#include "DHT.h"
-//Documentation here --> https://github.com/PaulStoffregen/Time
-//#include "time.h"
+#include "WiFi.h"
 
-const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = 0;
-const int   daylightOffset_sec = 3600;
+const char *dataFile = "data.json";
+const char *ntpServer = "us.pool.ntp.org";
+const long gmtOffset_sec = 0;
+const int daylightOffset_sec = 3600;
 
 // Network Credentials
-const char* ssid = "rato";
-const char* password = "imakestuff";
+//const char *ssid = "rato";
+// const char *password = "imakestuff";
 
 //Start the Async Web Server listening on port 80
 AsyncWebServer server(80);
 
-// Set to true to define Relay as Normally Open (NO)
-#define RELAY_NO false
-
-// Set number of relays, will be used in the array
-#define NUM_RELAYS  4
-
-// Assign each GPIO to a relay
-int relayGPIOs[NUM_RELAYS] = {26, 25, 33, 27};
+// "the brains" - a json object
+DynamicJsonDocument doc(2048); // from arduinoJson
 
 // Digital pin connected to the DHT sensor
-#define DHTPIN 32     
-
+#define DHTPIN 32
 // Uncomment the type of sensor in use:
-#define DHTTYPE    DHT11     // DHT 11
+#define DHTTYPE DHT11 // DHT 11
 //#define DHTTYPE    DHT22     // DHT 22 (AM2302)
 //#define DHTTYPE    DHT21     // DHT 21 (AM2301)
-
 //Send the pin and type of sensor
 DHT dht(DHTPIN, DHTTYPE);
 
-//
-const char* PARAM_INPUT_1 = "relay";  
-const char* PARAM_INPUT_2 = "state";
+void setup() {
 
-void setup(){
   // Serial port for debugging purposes
   Serial.begin(9600);
 
-  // Initialize SPIFFS 
+  // Initialize SPIFFS
   //That is the file system.
-  if(!SPIFFS.begin(true)){
+  if (!SPIFFS.begin(true)) {
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
-// Set all relays to off when the program starts - if set to Normally Open (NO), the relay is off when you set the relay to HIGH
-turnRelaysToOff();
 
-  /*
-  // Connect the ESP to the Wi-Fi using the credentials entered before
-  //with WiFi.mode(WIFI_STA) besides the wifi client we will have a access point
-  WiFi.mode(WIFI_AP_STA);// looks like this is not really needed, I need to investigate better how wifi works.
-  //So far the behaviour is that it creates a soft access point and also connect to the network thru access point 
-  //Here is how to start the soft access point :  WiFi.softAP("softap", "imakestuff");
-  //This part of the code was taken from https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/readme.html
-  Serial.print("Setting soft-AP ... ");
-  boolean result = WiFi.softAP("softap", "imakestuff");
-  if(result == true)
-  {
-    Serial.println("Soft Access Point Started");
-    IPAddress mySoftIP = WiFi.softAPIP();
-    Serial.print("Soft Acess Point IP address: ");
-    Serial.println(mySoftIP);
-  }
-  else
-  {
-    Serial.println("Soft Access Point Failed!");
-  }
-  */
-  WiFi.softAP("softap", "imakestuff");
+  // we always read the data.json from disk on startup (always!)
+  // Read json from the file ...
+
+  File f = SPIFFS.open("/data.json", "r");
+  String json = f.readString();
+  Serial.println("read file - BEGIN");
+  Serial.println(json);
+  Serial.println("read file - COMPLETE");
+  f.close();
+
+  // we take json from disk & create json object
+  Serial.println("json deserialize - BEGIN");
+  deserializeJson(doc, json);
+  JsonObject data = doc["data"];
+  const char* ssid = data["ssid"];
+  const char* password = data["password"];
+
+  // TODO: set OUTPUT for each relay
+  // TODO: also set each to off initially
+  //pinMode(relayGPIOs[i - 1], OUTPUT);
+  //digitalWrite(relayGPIOs[i - 1], HIGH);
+
+  //Lucio TODO: proactively disable everything / consider if we want to have it start in stopped state
+
+  Serial.printf("Connecting to wifi ssid:%s / password: %s", ssid, password);
+  WiFi.softAP(ssid, password);
   IPAddress IP = WiFi.softAPIP();
-  
-  //here  start wifi sessions as a client.
+
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -127,296 +94,225 @@ turnRelaysToOff();
   }
 
   // Print ESP32 Local IP Address
-  Serial.print("The Fabfarm Irrigation system network IP is:");
+  Serial.println("The Fabfarm Irrigation system network IP is:");
   Serial.println(WiFi.localIP());
-  //Serial.print("The gateway IP is:")
-  //Serial.println(WiFi.gatewayIP());
 
-  // Init and get the time from ntpServer
-  // some info on https://lastminuteengineers.com/esp32-ntp-server-date-time-tutorial/
-  // and here https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
-  // struct tm info: http://www.cplusplus.com/reference/ctime/tm/
-  // Still about Struct https://learn.adafruit.com/circuit-playground-simple-simon/the-structure-of-struct
-  
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  
-  //printFarmTime();
-  //Serial.print("Now the Short Version: ");
-  //printShortFarmTime();
-  
-  //Printing Only the hours and minutes
-  Serial.print("Prepare for time...");
-  modifiedPrintLocalTime();
-  Serial.println("");
-
-  //Print Only The hours
-  Serial.print("Now prepare again to get more time...");
-  Serial.print(gimeTime(1));
-  Serial.print(":");
-  Serial.println(gimeTime(2));
-
-/*
-*Now we are going to configure the route where server will be listening for incoming HTTP requests 
-and a function that will be executed when a request is received on that route.
-We specify this by calling the "on" method on the server object. With server.on(){}; 
-As first input, this method receives a string with the path where it will be listening. 
-We are going to set it to listen for requests on the “/” route. This could be anything. 
-It is basically what you write after the ip adress when in the browser or an APP.
-This website has a great explanation of the ESP32 Arduino: Asynchronous HTTP web server
-https://techtutorialsx.com/2017/12/01/esp32-arduino-asynchronous-http-webserver/
-So... 
-- First parameter here is: "/" thats the root directory.
-- Second parameter is HTTP_GET thats an enum of type WebRequestMethod a method defined in the library here --> https://github.com/me-no-dev/ESPAsyncWebServer/blob/63b5303880023f17e1bca517ac593d8a33955e94/src/ESPAsyncWebServer.h
-- Third parameter is a the function AsyncWebServerRequest
-So there is this c++ lambda function used here. My litle understanding is that they are locally declared unamed function this means they dont have a name and are declared locally :-)
- I don't grasp the concept fully haha.
- the syntax is [captures](params){body} where in here [] is empity
-*/
 
   // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/index.html", String(), false, processor);
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/index.html", String(), false);
   });
 
-  server.on("/temp.html", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/temp.html", String(), false, processor);
+  // Route to load style.css file
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/style.css", "text/css");
+  });
+  server.on("/all.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/all.css", "text/css");
+  });
+  server.on("/logo.jpeg", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/logo.jpeg", "image/jpeg");
   });
 
-  server.on("/farmtimenow", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", printShortFarmTime().c_str());
+  server.on("/getData", HTTP_GET, [](AsyncWebServerRequest *request) {
+    /* 
+    1) start with our json object.
+    2) we get new data (temp/humidit/y/relay status)
+    3) update the json object
+    4) serialize ==> json
+    5) return json to html 
+    */
+
+    struct tm timeinfo;
+    getLocalTime(&timeinfo);
+
+    Serial.println("/getData");
+    JsonObject data = doc["data"];
+    data["currentTime"] = timeinfo.tm_hour; // TODO: why aren't times working ?
+    data["temperature"] = readDHTTemperature(); // TODO: fix me
+    data["humidity"] = readDHTHumidity();
+
+    char json[1024];
+    Serial.println("Serialize json & return to caller - BEGIN");
+    serializeJson(doc, json);
+    Serial.println("Serialize json & return to caller - COMPLETE");
+
+    request->send(200, "application/json", json);
   });
-  server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", readDHTTemperature().c_str());
-  });
-  server.on("/humidity", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", readDHTHumidity().c_str());
-  });
-  
- // Send a GET request to <ESP_IP>/update?relay=<inputMessage>&state=<inputMessage2>
-  server.on("/update", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    String inputMessage;
-    String inputParam;
-    String inputMessage2;
-    String inputParam2;
-    // GET input1 value on <ESP_IP>/update?relay=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_1) & request->hasParam(PARAM_INPUT_2)) {
-      inputMessage = request->getParam(PARAM_INPUT_1)->value();
-      inputParam = PARAM_INPUT_1;
-      inputMessage2 = request->getParam(PARAM_INPUT_2)->value();
-      inputParam2 = PARAM_INPUT_2;
-      if(RELAY_NO){
-        Serial.print("NO ");
-        digitalWrite(relayGPIOs[inputMessage.toInt()-1], !inputMessage2.toInt());
-      }
-      else{
-        Serial.print("NC ");
-        digitalWrite(relayGPIOs[inputMessage.toInt()-1], inputMessage2.toInt());
-      }
+
+  AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/updateData", [](AsyncWebServerRequest *request, JsonVariant &json) {
+    doc = json.as<JsonObject>();
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+
+    Serial.println("Saving to disk - BEGIN");
+    //NOTE: we've had some issues with files not saving (permissions?)
+    File file = SPIFFS.open("/data.json", "w");
+    if (!file {
+      Serial.println("Faile to open file for writing");
     }
-    else {
-      inputMessage = "No message sent";
-      inputParam = "none";
-    }
-    Serial.println(inputMessage + inputMessage2);
 
-    //This is the last part of the lambda function. 
-    //This method receives as first input the HTTP response code, which will be 200 in our case.  This is the HTTP response code for “OK”.
-    request->send_P(200, "text/plain", "OK");
+    int bytesWritten = file.print(jsonString);
+    file.close();
+    Serial.printf("Saving to disk - COMPLETE(%d bytes)\n", bytesWritten);
+
+    request->send(200); // "application/json", jsonString);
+    Serial.println("-------------------");
+    Serial.println(jsonString);
+    Serial.println("-------------------");
   });
 
-  // Start server here
+  server.addHandler(handler);
+
+  // Start server 
   server.begin();
 }
 
-void loop(){
+// turn things on and off
+void loop() {
 
+  //sleep for a sec
+  //delay(500);
+
+  JsonArray data = doc["data"];
+  int override = data["override"];
+  // if(override) { .... }
+
+  JsonArray relays = doc["relays"];
+
+  for (int i = 0; i < relays.size(); i++) {
+
+    const char *relayName = relays[i]["name"]; // "relay1"
+    int pin = relays[i]["pin"];                // 123
+    int isEnabled = relays[i]["isEnabled"];    // 1
+    int duration = relays[i]["duration"];      // 1000
+    /* 
+    for (int j = 0; j < relays[i]["times"].size(); j++)
+    {
+      JsonObject times = relays[i][j].createNestedObject();
+      const char *startTime = times["startTime"]; // = "12:45";
+      int duration = times["duration"];           // = 25;
+      ---> turn on and off in here <---
+    }
+    */
+
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, isEnabled ? HIGH : LOW);
+  }
+
+  //      Serial.println("looping ...");
+  //turns things on and off: digitalWrite(relayGPIOs[i - 1], RELAY_NO ? HIGH : LOW);
+  //if (digitalRead(relayGPIOs[valveRelayNum - 1]))
+
+  /*
+if override is manual
+  for each relay
+    if enabled turn on
+    else turn off
+else
+    for each relay
+      if time frame maches turn on
+      else turn off
+
+*/
 }
 
-
-
 String readDHTTemperature() {
+
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   // Read temperature as Celsius (the default)
   float t = dht.readTemperature();
   // Read temperature as Fahrenheit (isFahrenheit = true)
   //float t = dht.readTemperature(true);
   // Check if any reads failed and exit early (to try again).
-  if (isnan(t)) {    
+  if (isnan(t)) {
     Serial.println("Failed to read from DHT sensor!");
-    return "--";
-  }
-  else {
+    return "Failed to read temperator from sensor";
+  } else { 
     Serial.println(t);
     return String(t);
   }
 }
 
-String readDHTHumidity() {
+String readDHTHumidity()
+{
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   float h = dht.readHumidity();
   if (isnan(h)) {
     Serial.println("Failed to read from DHT sensor!");
-    return "--";
-  }
-  else {
+    return "Failed to read humidity from sensor";
+  } else { 
     Serial.println(h);
     return String(h);
   }
 }
 
-// Replaces placeholder with button section in your web page
-String processor(const String& var){
-  //Serial.println(var);
-  if(var == "BUTTONPLACEHOLDER"){
-    String buttons ="";
-    for(int i=1; i<=NUM_RELAYS; i++){
-      String relayStateValue = relayState(i);
-      //Here parts of the HTML will be parsed to index.html like Relay # followed by its value in variable for the GPIO numbers
-      buttons+= "<h4>Turn on water on " + String(i) + "</h4><h4>Valve (relay) #" + String(i) + " - GPIO " + relayGPIOs[i-1] + "</h4><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + String(i) + "\" "+ relayStateValue +"><span class=\"slider\"></span></label>";
-    }
-    return buttons;
-  }
-  else if(var == "FARMTIMENOW"){
-    return printShortFarmTime();
-  }
-  else if(var == "TEMPERATURE"){
-    return readDHTTemperature();
-  }
-  else if(var == "HUMIDITY"){
-    return readDHTHumidity();
-  }
-  return String();
-}
-
-String relayState(int valveRelayNum){
-  if(RELAY_NO){
-    if(digitalRead(relayGPIOs[valveRelayNum-1])){
-      return "";
-    }
-    else {
-      return "checked";
-    }
-  }
-  else {
-    if(digitalRead(relayGPIOs[valveRelayNum-1])){
-      return "checked";
-    }
-    else {
-      return "";
-    }
-  }
-  return "";
-}
-
 //this function was found here https://arduino.stackexchange.com/questions/52676/how-do-you-convert-a-formatted-print-statement-into-a-string-variable
 //I did a minor change so instead of a void function it now returns a string to be used to show time in the webinterface
-String printFarmTime()
-{
+String printFarmTime() {
+
   time_t rawtime;
   struct tm timeinfo;
   getLocalTime(&timeinfo);
   char timeStringBuff[50]; //50 chars should be enough
-  strftime(timeStringBuff, sizeof(timeStringBuff), "%A, %B %d %Y %H:%M:%S", &timeinfo);
+  strftime(timeStringBuff, sizeof(timeStringBuff), "A,BdYH:M:S", &timeinfo);
   //print like "const char*"
   Serial.println(timeStringBuff);
 
-  //Construct to create the String object 
+  //Construct to create the String object
   String timeAsAString(timeStringBuff);
   return timeAsAString;
 }
-String printShortFarmTime()
-{
+
+String printShortFarmTime() {
+
   time_t rawtime;
   struct tm timeinfo;
+
   getLocalTime(&timeinfo);
   char timeStringBuff[50]; //50 chars should be enough
-  strftime(timeStringBuff, sizeof(timeStringBuff), "%H:%M:%S", &timeinfo);
-  //print like "const char*"
-  Serial.println(timeStringBuff);
+  strftime(timeStringBuff, sizeof(timeStringBuff), "H:M:S", &timeinfo);
 
-  //Construct to create the String object 
+  Serial.println("Checking time - BEGIN");
+  Serial.printf("Hour: %d\n", timeinfo.tm_hour);
+  Serial.printf("Minute: %d\n", timeinfo.tm_min);
+  Serial.println("Checking time - COMPLETE");
+  
+  //Construct to create the String object
   String timeAsAString(timeStringBuff);
   return timeAsAString;
 }
 
-void modifiedPrintLocalTime()
 // Function based on post in the https://forum.arduino.cc/index.php?topic=536464.0 Arduino Forum by user Abhay
-{ 
-    int OnlyYear;
-    int onlyMonth;
-    int onlyDay;
-    int onlyHour;
-    int onlyMin;
-    int onlySec;
-    
-    struct tm timeinfo;
-    if(!getLocalTime(&timeinfo)){
-        Serial.println("Failed to obtain time");
-        return;
-        }
-//Serial.println(&timeinfo, "%m %d %Y / %H:%M:%S");
-//scanf(&timeinfo, "%m %d %Y / %H:%M:%S")
-        onlyHour = timeinfo.tm_hour;
-        onlyMin  = timeinfo.tm_min;
-        onlySec  = timeinfo.tm_sec;
-        onlyDay = timeinfo.tm_mday;
-        onlyMonth = timeinfo.tm_mon + 1;
-        OnlyYear = timeinfo.tm_year +1900;
-        
-        //test
-        Serial.print("Print only Hour and Minutes...");
-        Serial.print(onlyHour);
-        Serial.print(":");
-        Serial.print(onlyMin);
-        }
+void modifiedPrintLocalTime() {
 
-int gimeTime(char what) {
+  int onlyYear;
+  int onlyMonth;
+  int onlyDay;
+  int onlyHour;
+  int onlyMin;
+  int onlySec;
 
-    int OnlyYear;
-    int onlyMonth;
-    int onlyDay;
-    int onlyHour;
-    int onlyMin;
-    int onlySec;
-
-    struct tm timeinfo;
-    if(!getLocalTime(&timeinfo)){
-      Serial.println("Failed to obtain time");
-      //return;
-      }
-    onlyHour = timeinfo.tm_hour;
-    onlyMin  = timeinfo.tm_min;
-    onlySec  = timeinfo.tm_sec;
-    onlyDay = timeinfo.tm_mday;
-    onlyMonth = timeinfo.tm_mon + 1;
-    OnlyYear = timeinfo.tm_year +1900;
-
-    switch (what) {
-      case 1:
-      return onlyHour;
-      break;
-      case 2:
-      return onlyMin;
-      break;
-      case 3:
-      return onlySec;
-      break;
-      default:
-    // if nothing else matches, do the default
-    // default is optional
-    break;
-    }
-}
-
-// Set all relays to off when the program starts - if set to Normally Open (NO), the relay is off when you set the relay to HIGH
-void turnRelaysToOff(){
-    for(int i=1; i<=NUM_RELAYS; i++){
-    pinMode(relayGPIOs[i-1], OUTPUT);
-    if(RELAY_NO){
-      digitalWrite(relayGPIOs[i-1], HIGH);
-    }
-    else{
-      digitalWrite(relayGPIOs[i-1], LOW);
-    }
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return;
   }
+  //Serial.println(&timeinfo, "mdY /H:M:S");
+  //scanf(&timeinfo, "mdY /H:M:S")
+  onlyHour = timeinfo.tm_hour;
+  onlyMin = timeinfo.tm_min;
+  onlySec = timeinfo.tm_sec;
+  onlyDay = timeinfo.tm_mday;
+  onlyMonth = timeinfo.tm_mon + 1;
+  onlyYear = timeinfo.tm_year + 1900;
+
+  //test
+  Serial.print("Print only Hour and Minutes...");
+  Serial.print(onlyHour);
+  Serial.print(":");
+  Serial.print(onlyMin);
 }
+

@@ -1,0 +1,28 @@
+{
+    "data": {
+        "currentTime": "Saturday, January 10th 10:45",
+        "temperature": 23,
+        "humidity": 45
+    },
+    "relays": [
+        {
+            "name": "pool",
+            "pin": 123,
+            "status": 1,
+            "times": [
+                { "startTime": "09:00", "duration": 4000},
+                { "startTime": "10:00", "duration": 4000}
+            ]
+        },
+        {
+            "name": "garden",
+            "pin": 234,
+            "status": 1,
+            "times": [
+                { "startTime": "11:00", "duration": 4000},
+                { "startTime": "12:00", "duration": 4000}
+            ]
+        }
+
+    ]
+}

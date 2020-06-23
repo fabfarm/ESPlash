@@ -2,165 +2,129 @@
 <html>
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- TODO: grab fontawesomes & server locally -->
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
-
-    <link rel="icon" href="data:,">
-    <style>
-        html {
-            font-family: Arial;
-            display: inline-block;
-            text-align: center;
-        }
-
-        h2 {
-            font-size: 3.0rem;
-        }
-
-        p {
-            font-size: 3.0rem;
-        }
-
-        body {
-            max-width: 600px;
-            margin: 0px auto;
-            padding-bottom: 25px;
-        }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 120px;
-            height: 68px
-        }
-
-        .switch input {
-            display: none
-        }
-
-        .slider {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            border-radius: 34px
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 52px;
-            width: 52px;
-            left: 8px;
-            bottom: 8px;
-            background-color: #fff;
-            -webkit-transition: .4s;
-            transition: .4s;
-            border-radius: 68px
-        }
-
-        input:checked+.slider {
-            background-color: #2196F3
-        }
-
-        input:checked+.slider:before {
-            -webkit-transform: translateX(52px);
-            -ms-transform: translateX(52px);
-            transform: translateX(52px)
-        }
-
-        .units {
-            font-size: 1.2rem;
-        }
-
-        .dht-labels {
-            font-size: 1.5rem;
-            vertical-align: middle;
-            padding-bottom: 15px;
-        }
-
-    </style>
-    <script language="javascript" src="serverDate.js"></script>
+    <link rel="stylesheet" type="text/css" href="/style.css" />
 </head>
-<script language="javascript">
-    var localTime = new Date();
-    document.write("Local machine time is: " + localTime + "<br>");
-    document.write("Server time is: " + date);
-    </script>
+
 <body>
     <h2>Fab Farm Irrigation System</h2>
-    
-    <p>
-        <i class="fas fa-clock"></i>
-        <span class="dht-labels">Farm Time</span>
-        <br>
-        <span id="farmtimenow">%FARMTIMENOW%</span>
-    </p>
-    <hr>
-    %BUTTONPLACEHOLDER%
-    <script>
-        function toggleCheckbox(element) {
-            var xhr = new XMLHttpRequest();
-            if (element.checked) {
-                xhr.open("GET", "/update?relay=" + element.id + "&state=1", true);
-            } else {
-                xhr.open("GET", "/update?relay=" + element.id + "&state=0", true);
-            }
-            xhr.send();
-        }
 
-    </script>
+    <img src="/logo.jpeg" style="height:400px;" /></p>
+        <i class="fas fa-clock"></i>
+        <span class="dht-labels">Farm Time:</span>
+        <span id="currentTime"></span>
+        <br/>
     <hr>
-    <p>
         <i class="fas fa-thermometer-half"></i>
-        <span class="dht-labels">Temperature</span>
-        <span id="temperature">%TEMPERATURE%</span>
+        <span id="temperature" class="dht-labels">Temperature</span>
         <sup class="units">&deg;C</sup>
-    </p>
     <hr>
-    <p>
         <i class="fas fa-tint"></i>
         <span class="dht-labels">Humidity</span>
-        <span id="humidity">%HUMIDITY%</span>
+        <span id="humidity"></span>
         <sup class="units">%</sup>
-    </p>
+    <hr/>
+    <div>
+    <div id="main"></div>
 
+ 
 </body>
 <script>
-    setInterval(function() {
-        var xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                document.getElementById("farmtimenow").innerHTML = this.responseText;
-            }
-        };
-        xhttp.open("GET", "/farmtimenow", true);
-        xhttp.send();
-    }, 10000);
+    // keep global json object - we'll update this on element change
 
-    setInterval(function() {
-        var xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                document.getElementById("temperature").innerHTML = this.responseText;
-            }
-        };
-        xhttp.open("GET", "/temperature", true);
-        xhttp.send();
-    }, 10000);
+    var jsonData; 
 
-    setInterval(function() {
-        var xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                document.getElementById("humidity").innerHTML = this.responseText;
+    // gets called anytime anything changes :)
+    function update(obj) {
+        jsonData.data.override = document.getElementById("jasonData.data.override").checked ? 1 : 0;
+        console.log(document.getElementById("jasonData.data.override"));
+        for(var i = 0; i < jsonData.relays.length; i++) { 
+            jsonData.relays[i].isEnabled = document.getElementById(`jsonData.relays[${i}].isEnabled`).checked ? 1 : 0;
+            for(j = 0; j < jsonData.relays[i].times.length; j++) {
+                jsonData.relays[i].times[j].duration  = document.getElementById(`jsonData.relays[${i}].times[${j}].duration`).value;
+                jsonData.relays[i].times[j].startTime = document.getElementById(`jsonData.relays[${i}].times[${j}].startTime`).value;
             }
-        };
-        xhttp.open("GET", "/humidity", true);
-        xhttp.send();
-    }, 10000);
+        }
+
+        var json = JSON.stringify(jsonData);
+        var xmlhttp = new XMLHttpRequest();   
+        xmlhttp.open("POST", "/updateData");
+        xmlhttp.setRequestHeader("Content-Type", "application/json;");
+        xmlhttp.send(json);
+    }
+
+    /* Currently we load this once from the server & it's working well.
+    Once we start pinging the server for updates, we'll run into the issue where this keep running over and over
+    again and will keep adding elements to the page ! We need to fix this so we build the page based on the json
+    and either
+    a) rebuild it per ping (?)
+    b) only update the relevant elements if it's already built
+    */
+    
+    //setInterval(function() {
+
+        //TODO: change the above to make *1* request and get json back
+        var r3 = new XMLHttpRequest();
+        r3.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                //document.getElementById("getData").innerHTML = this.responseText;
+                jsonData = JSON.parse(this.responseText);
+                document.getElementById("currentTime").innerText = jsonData.data.currentTime;
+                document.getElementById("temperature").innerText = jsonData.data.temperature;
+                document.getElementById("humidity").innerText = jsonData.data.humidity;
+
+                var html = `Manual 
+                        <label class="switch">
+                            <input type="checkbox" ${jsonData.data.override ? "checked" : ""} 
+                             onChange="update(this);" id="jasonData.data.override"/>
+                            <span class="slider"></span> 
+                        </label> Automatic`;
+
+                for(var i = 0; i  < jsonData.relays.length; i++) {
+                    var relay = jsonData.relays[i];
+                    html += `<hr/><div>Relay name:<b>${relay.name}</b> (pin ${relay.pin})</div>
+                                isRunning: [${relay.isRunning}]
+                                / Relay enabled: <span class="w3-hide-small">
+                                    <label class="switch">
+                                     <input id="jsonData.relays[${i}].isEnabled" type="checkbox" ${relay.isEnabled ? "checked": ""} 
+                                        onchange="update(this);"/>
+                                      <span class="slider"/>
+                                    </label>
+                                </span>
+                                <div>Schedules for relay:</div>`;
+
+                    // build list of schedules for this relay
+                    for(var j = 0; j < relay.times.length; j++) {
+                        time = relay.times[j];
+                        //console.log(time)
+                        var times = `<div style="width:100px;"></div> 
+                                    <label for="time"></label>
+                                        <div>
+                                            <span>Time ${j+1}</span>
+                                            <input id="jsonData.relays[${i}].times[${j}].startTime" type="time" style="width:100px;" 
+                                                    onChange="update(this);" 
+                                                    required value="${time.startTime}" />
+                                            <input id="jsonData.relays[${i}].times[${j}].duration" type="range" onChange="update(this);" 
+                                                    min="0" max="60" value="${time.duration}" step="1" class="slider2">
+                                        </div>
+                        `;
+
+                        html += times;
+                    }
+                }                    
+
+                var main = document.getElementById("main");
+                main.innerHTML = html; //this will REBUILD the page per ping (?)
+
+            };
+        }; 
+        r3.open("GET", "/getData", true);
+        //r3.open("GET", "sample.json", true);
+        r3.send();
+
+    //}, 10000);
 
 </script>
 

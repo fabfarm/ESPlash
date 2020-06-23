@@ -1,0 +1,42 @@
+{
+    "data": {
+        "currentTime": "Saturday, January 10th 10:45",
+        "temperature": 23,
+        "humidity": 45,
+        "override": 1        
+    },
+    "relays": [
+        {
+            "name": "Sauna",
+            "pin": 25,
+            "isRunning": 1,
+            "isEnabled": 1,
+            "times": [
+                { "startTime": "10:00", "duration": 5}
+            ]},
+        {
+            "name": "Natalias Spa",
+            "pin": 26,
+            "isRunning": 1,
+            "isEnabled": 0,
+            "status": 1,
+            "times": [
+                { "startTime": "12:45", "duration": 15},
+                { "startTime": "16:45", "duration": 20}
+            ]
+        },
+        {
+            "name": "Lucios Hot Tub",
+            "pin": 33,
+            "isRunning": 1,
+            "isEnabled": 1,
+            "status": 1,
+            "times": [
+                { "startTime": "12:45", "duration": 25},
+                { "startTime": "10:00", "duration": 10},
+                { "startTime": "16:45", "duration": 30}
+            ]
+        }
+
+    ]
+}
