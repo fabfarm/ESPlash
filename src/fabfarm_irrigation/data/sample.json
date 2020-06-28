@@ -1,22 +1,26 @@
 {
     "data": {
-        "currentTime": "Tuesday, June 23 2020 11:54:16",
-        "temperature": "29.90",
-        "humidity": "51.00",
-        "override": 0,
+        "currentTime": "Friday, June 26 2020 23:32:10",
+        "temperature": "21.30",
+        "humidity": "85.00",
+        "batLevel": "91.00",
+        "isScheduleMode": 0,
         "ssid": "rato",
         "pass": "imakestuff"
+
     },
     "relays": [
         {
             "name": "Fruit Tree",
-            "pin": 25,
+            "pin": 27,
             "isRunning": 1,
             "isEnabled": 0,
             "times": [
                 {
-                    "startTime": "03:00",
-                    "duration": "0"
+                    "startTime": "01:01",
+                    "duration": 0,
+                    "hour": 1,
+                    "min": 1
                 }
             ]
         },
@@ -28,33 +32,31 @@
             "status": 1,
             "times": [
                 {
-                    "startTime": "12:00",
-                    "duration": "0"
-                },
-                {
-                    "startTime": "12:30",
-                    "duration": "0"
+                    "startTime": "02:02",
+                    "duration": 32,
+                    "hour": 2,
+                    "min": 2
                 }
             ]
         },
         {
             "name": "Cypress Hill",
-            "pin": 33,
+            "pin": 25,
             "isRunning": 1,
             "isEnabled": 0,
             "status": 1,
             "times": [
                 {
-                    "startTime": "12:45",
-                    "duration": "0"
+                    "startTime": "03:03",
+                    "duration": 60,
+                    "hour": 3,
+                    "min": 3
                 },
                 {
-                    "startTime": "10:00",
-                    "duration": "0"
-                },
-                {
-                    "startTime": "16:45",
-                    "duration": "0"
+                    "startTime": "03:03",
+                    "duration": 60,
+                    "hour": 3,
+                    "min": 3
                 }
             ]
         }

@@ -2,28 +2,28 @@ html {
     font-family: Arial;
     display: inline-block;
     text-align: center;
-}
-
-h2 {
+  }
+  
+  h2 {
     font-size: 2.2rem;
-}
-
-p {
-
+  }
+  
+  p {
+  
     font-size: 2rem;
-}
-
-body {
+  }
+  
+  body {
     max-width: 400px;
     margin: 0px auto;
     padding-bottom: 25px;
-}
-
-table {
+  }
+  
+  table {
     width: 100%;
-}
-
-input {
+  }
+  
+  input {
     border: 1px solid #ccc;
     color: #888;
     margin: 0.5em;
@@ -32,42 +32,43 @@ input {
     padding: 0.5em 1em;
     border-radius: 4px;
     width: calc(100% - 3em - 2px);
-}
-
-#output {
+  }
+  
+  #output {
     background: lightyellow;
     padding: 10px;
     border: 1px solid tan;
     margin: 0 0 10px 0;
-}
-
-.switch {
+  }
+  
+  .switch {
     line-height: 47px;
     vertical-align: middle;
     display: inline-block;
     position: relative;
     width: 120px;
     height: 40px
-}
-
-.switch input {
+  }
+  
+  .switch input {
     display: none
-}
-.switch_2 {
+  }
+  
+  .switch_2 {
     line-height: 47px;
     vertical-align: middle;
     display: inline-block;
     position: relative;
     width: 220px;
     height: 40px
-}
-
-.switch_2 input {
+  }
+  
+  .switch_2 input {
     display: none
-}
-
-.slider_0 {
-
+  }
+  
+  .slider_0 {
+  
     position: absolute;
     top: 0;
     left: 0;
@@ -75,9 +76,9 @@ input {
     bottom: 0;
     background-color: #ccc;
     border-radius: 30px
-}
-
-.slider_0:before {
+  }
+  
+  .slider_0:before {
     position: absolute;
     content: "";
     height: 25px;
@@ -88,11 +89,11 @@ input {
     -webkit-transition: .4s;
     transition: .4s;
     border-radius: 68px
-}
-
-
-.slider {
-
+  }
+  
+  
+  .slider {
+  
     position: absolute;
     top: 0;
     left: 0;
@@ -100,9 +101,9 @@ input {
     bottom: 0;
     background-color: #ccc;
     border-radius: 30px
-}
-
-.slider:before {
+  }
+  
+  .slider:before {
     position: absolute;
     content: "";
     height: 25px;
@@ -113,19 +114,19 @@ input {
     -webkit-transition: .4s;
     transition: .4s;
     border-radius: 68px
-}
-
-input:checked+.slider {
+  }
+  
+  input:checked+.slider {
     background-color: #2196F3
-}
-
-input:checked+.slider:before {
+  }
+  
+  input:checked+.slider:before {
     -webkit-transform: translateX(52px);
     -ms-transform: translateX(52px);
     transform: translateX(52px)
-}
-
-.slider2 {
+  }
+  
+  .slider2 {
     -webkit-appearance: none;
     margin: 14px;
     width: 140px;
@@ -134,20 +135,21 @@ input:checked+.slider:before {
     outline: none;
     -webkit-transition: .2s;
     transition: opacity .2s;
-}
-
-.slider2::-webkit-slider-thumb {
+  }
+  
+  .slider2::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 30px;
     height: 30px;
     background: #2f4468;
     cursor: pointer;
-}
-
-.slider2::-moz-range-thumb {
+  }
+  
+  .slider2::-moz-range-thumb {
     width: 30px;
     height: 30px;
     background: #2f4468;
     cursor: pointer;
-}
+  }
+  

@@ -3,15 +3,14 @@
 
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
     <!-- TODO: grab fontawesomes & server locally -->
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
     <link rel="stylesheet" type="text/css" href="/style.css" />
 </head>
-
 <body>
-    <h2>Fab Farm Irrigation System</h2>
-
-    <img src="/logo.jpeg" style="height:400px;" /></p>
+    <img src="/logo.png" style="height:400px;" />
+    <hr>
         <i class="fas fa-clock"></i>
         <span class="dht-labels">Farm Time:</span>
         <span id="currentTime"></span>
@@ -20,28 +19,42 @@
         <i class="fas fa-thermometer-half"></i>
         <span id="temperature" class="dht-labels">Temperature</span>
         <sup class="units">&deg;C</sup>
-    <hr>
         <i class="fas fa-tint"></i>
         <span class="dht-labels">Humidity</span>
         <span id="humidity"></span>
         <sup class="units">%</sup>
+        <i class="fas fa-battery-full"></i>
+        <span class="dht-labels">Battery</span>
+        <span id="batLevel"></span>
+        <sup class="units">%</sup>
     <hr/>
+    <h3>Irrigation System</h3>
     <div id="main"></div>
 </body>
-
 <script>
     // keep global json object - we'll update this on element change
     var jsonData; 
 
     // gets called anytime anything changes
     function update(obj) {
-        jsonData.data.override = document.getElementById("jasonData.data.override").checked ? 1 : 0;
-        console.log(document.getElementById("jasonData.data.override"));
+        jsonData.data.isScheduleMode = document.getElementById("jasonData.data.isScheduleMode").checked ? 1 : 0;
+        console.log(document.getElementById("jasonData.data.isScheduleMode"));
         for(var i = 0; i < jsonData.relays.length; i++) { 
             jsonData.relays[i].isEnabled = document.getElementById(`jsonData.relays[${i}].isEnabled`).checked ? 1 : 0;
             for(j = 0; j < jsonData.relays[i].times.length; j++) {
-                jsonData.relays[i].times[j].duration  = document.getElementById(`jsonData.relays[${i}].times[${j}].duration`).value;
+                //first part of code parses value to the json    // second part reads from?????????
+                jsonData.relays[i].times[j].duration  = parseInt(document.getElementById(`jsonData.relays[${i}].times[${j}].duration`).value);
                 jsonData.relays[i].times[j].startTime = document.getElementById(`jsonData.relays[${i}].times[${j}].startTime`).value;
+                //here I hack my way into separating hours and minutes into a int to the jason!
+                var time = document.getElementById(`jsonData.relays[${i}].times[${j}].startTime`).value;
+                var timex = (new Date(" Jan 01 2020 " + time));
+                //console.log(timex);
+                var hour = timex.getHours();
+                var min = timex.getMinutes();
+                //console.log(hour)
+                //console.log(min)
+                jsonData.relays[i].times[j].hour = hour;
+                jsonData.relays[i].times[j].min = min;
             }
         }
 
@@ -65,6 +78,7 @@
     
     //setInterval(function() {
         //TODO: change the above to make *1* request and get json back
+    function refresh() {
         var r3 = new XMLHttpRequest();
         r3.onreadystatechange = function() {
             if (this.readyState == 4 && this.status == 200) {
@@ -73,28 +87,27 @@
                 document.getElementById("currentTime").innerText = jsonData.data.currentTime;
                 document.getElementById("temperature").innerText = jsonData.data.temperature;
                 document.getElementById("humidity").innerText = jsonData.data.humidity;
+                document.getElementById("batLevel").innerText = jsonData.data.batLevel;
 
                 var html = `Manual 
                         <label class="switch">
-                            <input type="checkbox" ${jsonData.data.override ? "checked" : ""} 
-                             onChange="update(this);" id="jasonData.data.override"/>
+                            <input type="checkbox" ${jsonData.data.isScheduleMode ? "checked" : ""} 
+                             onChange="update(this);" id="jasonData.data.isScheduleMode"/>
                             <span class="slider"></span> 
                         </label> Automatic`;
 
                 // Build html for relays & their schedulesk
                 for(var i = 0; i  < jsonData.relays.length; i++) {
                     var relay = jsonData.relays[i];
-                    html += `<hr/><div>Relay name:<b>${relay.name}</b> (pin ${relay.pin})</div>
-                                isRunning: [${relay.isRunning}]
-                                / Relay enabled: <span class="w3-hide-small">
+                    html += `<hr/><div>Zone:<b>${relay.name}</b> (pin ${relay.pin})</div>
+                    <br>
+                                <span class="w3-hide-small">
                                     <label class="switch">
                                      <input id="jsonData.relays[${i}].isEnabled" type="checkbox" ${relay.isEnabled ? "checked": ""} 
                                         onchange="update(this);"/>
                                       <span class="slider"/>
                                     </label>
-                                </span>
-                                <div>Schedules for relay:</div>`;
-
+                                    <!--</span> On (1) / Off (0) = ${relay.isRunning}-->`;
                     // Build list of schedules for this relay
                     for(var j = 0; j < relay.times.length; j++) {
                         time = relay.times[j];
@@ -120,10 +133,17 @@
         }; 
 
         r3.open("GET", "/getData", true);
+        r3.timeout = 2000;
+        r3.ontimeout = function(e) {
+            // retry
+            refresh();
+        };
         // for testing:
         //r3.open("GET", "sample.json", true);
         r3.send();
+    }
 
+    refresh();
 
     //}, 10000);
 

@@ -24,12 +24,39 @@ ValveN /
 
 ## Core Logic
 
+1) start with our json object.
+2) we get new data (temp/humidit/y/relay status)
+3) update the json object
+4) serialize ==> json
+5) return json to html
+
 **State Problem**  
 When the microcontroller loses power, we lose state. We therefore need to persist settings to disk.
 
 - Settings are *read* from disk on startup
 - Settings are *saved* each time a user changes settings in the web ui
 - Settings are kept in memory and we check against them
+
+Psuedo code:
+```
+Startup: 
+  - read json to doc obj
+  - init wifi
+  - init http server
+
+/get 
+  - serialize doc obj to Json
+  - return Json to caller
+  - no logic
+
+/update 
+  - take incoming Json and save it to disk
+  - aduinoJson magically serializes incoming request to our doc object for free
+  - no logic 
+
+Loop (no disk i/o):
+  - examine current state of in memory doc object and take action
+```
 
 ## Data format
 
@@ -40,8 +67,8 @@ When the microcontroller loses power, we lose state. We therefore need to persis
         "temperature": "29.90",
         "humidity": "51.00",
         "override": 0,
-        "ssid": "rato",
-        "pass": "imakestuff"
+        "ssid": "myssid",
+        "pass": "my password"
     },
     "relays": [
         {

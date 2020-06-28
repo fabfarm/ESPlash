@@ -1,9 +1,19 @@
 
 /**
- *  LucioPGN  
+ * This code is part of a Irrigation Sytem developed as my final project,
+ * in the Fabacademy course, full documentation can be viewed on the link:
+ * http://fabacademy.org/2020/labs/algarve/students/lucio/index.html
+ * 
+ * The begining of the code was based on the works of Rui Santos. With the 
+ * contributions of Jeff and my obssession in learning to code its significantly 
+ * different a Special thanks to Jeffrey Knight who without I would be probabily
+ * struglyng with the most advanced parts of the project.
+ * 
+ * Project page: http://github.com/fabfarm/esplash
+ * 
  * Contributors:
+ *  Lucio PGN http://github.com/lpgn
  *  Jeffrey Knight http://github.com/jknight
- *
  */
 
 #include <fstream>
@@ -34,7 +44,15 @@ AsyncWebServer server(80);
 int jasonSize = 2048;
 DynamicJsonDocument doc(jasonSize); // from arduinoJson
 
+//Defining pump pin number
+int pumpPin = 33;
+int batVolt = 35;
 void setup(){
+
+
+  //defining behaviour of pumpPin and its startup state
+  pinMode (pumpPin, OUTPUT);
+  digitalWrite (pumpPin, LOW);
   
   //put all relays in LOW at startup
   //TODO write to Json as well otherwise it reactivates
@@ -67,40 +85,23 @@ void setup(){
   Serial.println("json deserialize test - BEGIN");
   deserializeJson(doc, json);
 
-  //
-  //test override value in Jason
-  //Serial.print("Printing override value in void setup after deserialisation: ");
-  //JsonArray data = doc["data"];
-  //int override = data["data"]["override"];
-  //Serial.println(override);
-  //delay(1000);
-
   // TODO: proactively disable everything / consider if we want to have it start in stopped state
   // TODO: set OUTPUT for each relay
   // TODO: also set each to off initially
   //pinMode(relayGPIOs[i - 1], OUTPUT);
   //digitalWrite(relayGPIOs[i - 1], HIGH);
 
-  //Serial.println("Reading ssid: %s / password: %s from json\n", ssid, password);
-  
   //Soft Wifi Access point setup
   WiFi.softAP("softap", "imakestuff");
   IPAddress IP = WiFi.softAPIP();
+  //tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, "irrigation");
   //start wifi sessions as a client.
   //Wifi client setup
   const char* ssid = doc["data"]["ssid"];
   const char* password = doc["data"]["pass"];
+  ssid = "rato";
+  password = "imakestuff";
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(1000);
-    Serial.println("Connecting to WiFi..");
-  }
-  
-  // Print ESP32 Local IP Address
-  Serial.println("The Fabfarm Irrigation system network IP is:");
-  Serial.println(WiFi.localIP());
-
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SPIFFS, "/index.html", String(), false);
@@ -112,24 +113,18 @@ void setup(){
   server.on("/all.css", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SPIFFS, "/all.css", "text/css");
   });
-  server.on("/logo.jpeg", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/logo.jpeg", "image/jpeg");
+  server.on("/logo.png", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/logo.png", "image/png");
   });
   server.on("/getData", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-  /* 
-  1) start with our json object.
-  2) we get new data (temp/humidit/y/relay status)
-  3) update the json object
-  4) serialize ==> json
-  5) return json to html 
-  */
 
   Serial.println("/getData");
   JsonObject data = doc["data"];
   data["currentTime"] = printFarmTime();
   data["temperature"] = readDHTTemperature();
   data["humidity"] = readDHTHumidity();
+  data["batLevel"] = batLevel();
   char json[2048];
   Serial.println("Serialize json & return to caller - BEGIN");
   serializeJson(doc, json);
@@ -170,15 +165,33 @@ void setup(){
 
 void loop()
 {
-  File f = SPIFFS.open("/data.json", "r");
-  // Declares a String named json from the data contained in f????
-  String json = f.readString();
-  deserializeJson(doc, json);
+  if  (WiFi.status() != WL_CONNECTED)
+  {
+    //WiFi.begin(ssid, password);
+    #if !defined(ssid)
+    const char* ssid = doc["data"]["ssid"];
+    #endif // MACRO
+    #if !defined(password)
+    const char* password = doc["data"]["pass"];
+    #endif // MACRO
+    ssid = "rato";
+    password = "imakestuff";
+    delay(100);
+    Serial.println("Connecting to WiFi..");
+    WiFi.begin(ssid, password);
+  }
+  else
+  {
+    Serial.println("Connected to WiFi!");
+    // Print ESP32 Local IP Address
+    Serial.print("The Fabfarm Irrigation system network IP is:");
+    Serial.println(WiFi.localIP());
+  }
+  delay(100);
   JsonObject data = doc["data"];
-  boolean data_override = data["override"];
-  f.close();
+  boolean data_isScheduleMode = data["isScheduleMode"];
 
-  if (data_override == 0){
+  if (data_isScheduleMode == 0){
     manualMode();
   }
   else{
@@ -189,67 +202,55 @@ void loop()
 }
 
 void scheduleMode(){
-  Serial.println("now Schedule Mode");
-  delay(1000);
+  delay(100);
+  //matrix logic test
 
-  //for this we will need a binary counter
-  //for (int j = 0; j < relays[j]["times"].size(); j++)
-
-  // initialize the pixel matrix:
   JsonArray relays = doc["relays"];
-  JsonObject times = relays.createNestedObject();
-  for (int p = 0; p < relays.size(); p++) 
-  {
-    //JsonArray times = relays[p].createNestedArray("times");
-    Serial.print("Print value of P: ");
-    Serial.println(p);
-    //the 3 in the test bellow needs to be replaced by the size of times in each pin
-    for (int tM = 0; tM < 3; tM++) {
-      int pin = relays[p]["pin"];
-      String relaysStartTime = relays[p]["times"][tM]["startTime"]; // "12:00"
-      int relaysDuration = relays[p]["times"][tM]["duration"]; // "0"
-      //int  relaysDuration = times["duration"];
-      //int  startTime = times["startTime"];
-
-      //TODO need to split time properly from the Json into hours and minutes
-      //int minTime = (relaysStartTime*60+relaysDuration);
-      //Serial.print("Print Start Time in Minutes");
-      //Serial.println(minTime);
-
-      delay(1000);
-
-      Serial.print("Print value of P: ");
-      Serial.println(p);
-      Serial.print("Print value of T: ");
-      Serial.println(tM);
-      Serial.print("Print value of pin: ");
-      Serial.println(pin);
-      Serial.print("Print value of Start Time: ");
-      Serial.println(relaysStartTime);
-      Serial.print("Print value of duration: ");
-      Serial.println(relaysDuration);
-      /*
-      int currentTime = 12;
-      int timer=0;
-      if(currentTime == relaysStartTime){
-      timer=millis();
-      digitalWrite (pin, HIGH);
-      if((millis() - timer) >= relaysDuration) {
-        digitalWrite (pin, LOW);  
-      }
-      */
-
-      //int farmtempo = 4;
-/*
-      if (farm time is different than time windows)
+  for (int i = 0; i < relays.size(); i++){
+    int flagEnableRelay = 0;
+    for (int j = 0; j < relays[i]["times"].size(); j++) {
+      //aparentelly there is no problem to set digital write several times as it only dows write a different value, need to check that. https://forum.arduino.cc/index.php?topic=52806.0
+      pinMode(relays[i]["pin"], OUTPUT);
+      const char* relaysStartTime = relays[i]["times"][j]["startTime"];
+      int hOurs = relays[i]["times"][j]["hour"];
+      int mIns = relays[i]["times"][j]["min"];
+      int cycleDuration = relays[i]["times"][j]["duration"];
+      //Probabilly should learn about bitwise... https://playground.arduino.cc/Code/BitMath/
+      if (isEnabledFunc(hOurs*60+mIns, cycleDuration) == 1)
       {
-        digitalWrite(pin[p], HIGH);
+        ++flagEnableRelay;
       }
-      else
+    }
+    if (flagEnableRelay >= 1)
+    {
+      digitalWrite(relays[i]["pin"], 1);
+      delay(500);
+      digitalWrite(pumpPin, 1);
+      Serial.print("Zone ");
+      String zoneName = relays[i]["name"];
+      Serial.print(zoneName);
+      Serial.println(" is Enabled!");
+    }
+    else
+    {   
+      int valveFlag = 0;
+      for (int y = 0; y < relays.size(); y++)
       {
-        digitalWrite(pin[p], LOW);
+        if (digitalRead (relays[y]["pin"]) == HIGH)
+        {
+          ++valveFlag;
+        }
       }
-      */
+      if (valveFlag == 0)
+        {
+          digitalWrite(pumpPin, 0);
+        }
+      delay(500);
+      digitalWrite(relays[i]["pin"], 0);
+      Serial.print("Zone ");
+      String zoneName = relays[i]["name"];
+      Serial.print(zoneName);
+      Serial.println(" is off");
     }
   }
 }
@@ -257,28 +258,45 @@ void scheduleMode(){
 void manualMode()
 {
   Serial.println("now Manual Mode");
-  delay(1000);
-
+  delay(100);
   JsonArray relays = doc["relays"];
   for (int i = 0; i < relays.size(); i++)
   {
-    const char *relayName = relays[i]["name"]; // "relay1"
-    int pin = relays[i]["pin"];                // 123
-    int isEnabled = relays[i]["isEnabled"];    // 1
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, isEnabled ? HIGH : LOW);
+    pinMode(relays[i]["pin"], OUTPUT);
+    if (relays[i]["isEnabled"] == 1)
+    {
+      digitalWrite(relays[i]["pin"], 1);
+      delay(500);
+      digitalWrite(pumpPin, 1);
     }
+    else
+    {   
+      int valveFlag = 0;
+      for (int y = 0; y < relays.size(); y++)
+      {
+        if (digitalRead (relays[y]["pin"]) == HIGH)
+        {
+          ++valveFlag;
+        }
+      }
+      if (valveFlag == 0)
+        {
+          digitalWrite(pumpPin, 0);
+        }
+      delay(500);
+      digitalWrite(relays[i]["pin"], 0);
+      Serial.print("Zone ");
+      String zoneName = relays[i]["name"];
+      Serial.print(zoneName);
+      Serial.println(" is off");
+    }
+  }
 }
 
-//function to deactivate all pins usefull for safe startup
-//write to json
+//function to deactivate all pins usefull for safe startup not finished yet
 void allRelaysdisable(){
-  File f = SPIFFS.open("/data.json", "r");
-  // Declares a String named json from the data contained in f????
-  String json = f.readString();
-  deserializeJson(doc, json);
+  delay(100);
   JsonObject data = doc["data"];
-  f.close();
     JsonArray relays = doc["relays"];
     for (int p = 0; p < relays.size(); p++)
   {
@@ -287,13 +305,6 @@ void allRelaysdisable(){
     digitalWrite(pin,LOW);
   }
 }
-
-
-void checkTime()
-{
- 
-}
-
 
 String readDHTTemperature()
 {
@@ -309,7 +320,7 @@ String readDHTTemperature()
   // Read temperature as Celsius (the default)
   float t = dht.readTemperature();
   // Read temperature as Fahrenheit (isFahrenheit = true)
-  //float t = dht.readTemperature(true);
+  // float t = dht.readTemperature(true);
   // Check if any reads failed and exit early (to try again).
   if (isnan(t))
   {
@@ -347,30 +358,38 @@ String readDHTHumidity()
   }
 }
 
-void activateValveThanPump(){
+int isEnabledFunc (int startTimeInMinutes, int duration)
+{
 
-//If valveRelay "armed" AND the current time minus the start time is greater than x millisecons (pumpRelay, ditalwrite, HIGH);
-//If pumpRelay "armed" AND current reading is outside threshold, reset "armed"
-
+  const char *ntpServer = "us.pool.ntp.org";
+  const long gmtOffset_sec = 0;
+  const int daylightOffset_sec = 3600;
+  int onlyHour;
+  int onlyMin;
+  int onlySec;
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  struct tm timeinfo;
+  getLocalTime(&timeinfo);
+  onlyHour = timeinfo.tm_hour;
+  onlyMin = timeinfo.tm_min;
+  onlySec = timeinfo.tm_sec;
+  int presentTimeInMinutes = onlyHour*60+onlyMin;
+  int isEnabled;
+    if (startTimeInMinutes <= presentTimeInMinutes && presentTimeInMinutes <= startTimeInMinutes+duration){
+    isEnabled = 1;
+    //Serial.println("time to start the pump!");
+  }
+    else
+    {
+      isEnabled = 0;
+    }
+  return isEnabled;
 }
-
-void activatePumpThanValve(){
-
-//when pumpRelay disarmed --> "LOW" AND the current time minus the stop time is greater than x millisecons (valveRelay, ditalwrite, LOW);
-
-
+float batLevel(){
+  analogRead(batVolt);
+  float batteryLevel = map(analogRead(batVolt), 0.0f, 4095.0f, 0, 100);
+  Serial.print("Batery Level: ");
+  Serial.print(batteryLevel);
+  Serial.println("%");
+  return batteryLevel;
 }
-
-void checktime () {
-/*
-
-        */
-}
-
-
-
-
-
-
-
-
