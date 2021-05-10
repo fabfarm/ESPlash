@@ -61,7 +61,7 @@ const long gmtOffset_sec = 0;
 const int daylightOffset_sec = 3600;
 
 // Network Credentials
-const char *ssid = "rato";
+const char *ssid = "fabfarm_ele_container";
 const char *password = "imakestuff";
 
 //Start the Async Web Server listening on port 80
